@@ -1,19 +1,3 @@
-/*
- * File name: PID_LF_example
- * 
- * Hardware requirements: an Arduino Pro Mini
- *                        a QTR-8RC Reflectance Sensor Array
- *                        a DRV8835 Dual Motor Driver Carrier 
- *                        
- * Description: The basic PID control system implemented with 
- *              the line follower with the specified hardware. 
- *              The robot can follow a black line on a white surface 
- *              (or vice versa). 
- * Related Document: See the written documentation or the LF video from
- *                   Bot Reboot.
- *                   
- * Author: Bot Reboot
- */
 
 #include <QTRSensors.h> //Make sure to install the library
 
@@ -27,10 +11,10 @@ uint16_t sensorValues[SensorCount];
 /*************************************************************************
 * PID control system variables 
 *************************************************************************/
-float Kp = 0.15; //related to the proportional control term; 
+float Kp = 0.28; //related to the proportional control term; 
               //change the value by trial-and-error (ex: 0.07).
               // Sweet spot: 0.06
-float Ki = 0.01; //related to the integral control term; 
+float Ki = 0.008; //related to the integral control term; 
               //change the value by trial-and-error (ex: 0.0008).
 float Kd = 0.8; //related to the derivative control term; 
               //change the value by trial-and-error (ex: 0.6).
@@ -47,10 +31,10 @@ boolean onoff = false;
 /*************************************************************************
 * Motor speed variables (choose between 0 - no speed, and 255 - maximum speed)
 *************************************************************************/
-const uint8_t maxspeeda = 250;
-const uint8_t maxspeedb = 250;
-const uint8_t basespeeda = 220;
-const uint8_t basespeedb = 220;
+const uint8_t maxspeeda = 255;
+const uint8_t maxspeedb = 255;
+const uint8_t basespeeda = 240;
+const uint8_t basespeedb = 240;
 
 /*************************************************************************
 * DRV8835 GPIO pins declaration
@@ -72,21 +56,14 @@ void rotate_right();
 void rotate_left();
 void test_emmiter();
 
-/*************************************************************************
-* Function Name: setup
-**************************************************************************
-* Summary:
-* This is the setup function for the Arduino board. It first sets up the 
-* pins for the sensor array and the motor driver. Then the user needs to 
-* slide the sensors across the line for 10 seconds as they need to be 
-* calibrated. 
-* 
-* Parameters:
-*  none
-* 
-* Returns:
-*  none
-*************************************************************************/
+int arr[SensorCount];
+int thresh = 500;
+void toBinaryArray() {
+  for (int i = 0; i < SensorCount; i++) {
+    arr[i] = sensorValues[i] > thresh;
+  }
+}
+
 void setup() {
   qtr.setTypeRC();
   qtr.setSensorPins((const uint8_t[]){8, A0, A1, A2, A3, A4, A5, 7}, SensorCount);
@@ -117,26 +94,14 @@ void setup() {
       Ok = true;
     }
   }
-  test_emmiter();
+  // test_emmiter();
   forward_brake(0, 0); //stop the motors
   Serial.println("Calibrated");
+
+  char mode;
 }
 
-/*************************************************************************
-* Function Name: calibration
-**************************************************************************
-* Summary:
-* This is the calibration function for the QTR-8RC Reflectance Sensor Array. 
-* The function calls the method 'qtr.calibrate()' offered by the imported 
-* library. For approx. 10 seconds, each of the 8 sensors will calibrate with
-* readings from the track. 
-* 
-* Parameters:
-*  none
-* 
-* Returns:
-*  none
-*************************************************************************/
+
 void calibration() {
   digitalWrite(LED_BUILTIN, HIGH);
   for (uint16_t i = 0; i < 170; i++)
@@ -166,53 +131,22 @@ void rotate_left() {
   analogWrite(benbl, 0);
 }
 
-void test_emmiter() {
-  for (uint8_t i = 0; i < SensorCount; i++)
-  {
-    Serial.print(qtr.calibrationOn.minimum[i]);
-    Serial.print(' ');
-  }
-  Serial.println();
-
-  // print the calibration maximum values measured when emitters were on
-  for (uint8_t i = 0; i < SensorCount; i++)
-  {
-    Serial.print(qtr.calibrationOn.maximum[i]);
-    Serial.print(' ');
-  }
-  Serial.println();
-  Serial.println();
-}
-
-/*************************************************************************
-* Function Name: loop
-**************************************************************************
-* Summary:
-* This is the main function of this application. When the start button is
-* pressed, the robot will toggle between following the track and stopping.
-* When following the track, the function calls the PID control method. 
-* 
-* Parameters:
-*  none
-* 
-* Returns:
-*  none
-*************************************************************************/
-
 void loop() {
   PID_control();
-  // delay(200);
+  // delay(500);
 
-  qtr.readCalibrated(sensorValues);
+  // qtr.read(sensorValues);
   
-  // while (position == 0) {
-  //   position = qtr.readLineBlack(sensorValues);
-  //   forward_brake(250, -250);
-  // } 
-  // while (position == 7000) {
-  //   position = qtr.readLineBlack(sensorValues);
-  //   forward_brake(-250, 250);
-  // }
+  while (position == 0) {
+    delay(200);
+    position = qtr.readLineBlack(sensorValues);
+    forward_brake(250, -250);
+  } 
+  while (position == 7000) {
+    delay(200);
+    position = qtr.readLineBlack(sensorValues);
+    forward_brake(-250, 250);
+  }
 
   
 
@@ -221,11 +155,26 @@ void loop() {
   for (uint8_t i = 0; i < SensorCount; i++)
   {
     Serial.print(sensorValues[i]);
+    Serial.print('_');
+    Serial.print(arr[i]);
     Serial.print('\t');
   }
   Serial.println();
 
-  // if(digitalRead(buttonstart) == HIGH) {
+  toBinaryArray();
+
+  
+
+  // if(arr[0] && arr[1] && arr[2] && arr[3] && arr[4] && arr[5] && arr[6] && arr[7]) {
+  //   forward_brake(0, 0);
+  //   pinMode(LED_BUILTIN, HIGH);
+  //   Serial.println("The End");
+  //   while(1) {}
+  // }
+
+
+
+  // if(analogRead(buttonstart) > 700) {
   //   onoff =! onoff;
   //   if(onoff = true) {
   //     delay(1000);//a delay when the robot starts
@@ -242,26 +191,7 @@ void loop() {
   // }
 }
 
-/*************************************************************************
-* Function Name: forward_brake
-**************************************************************************
-* Summary:
-* This is the control interface function of the motor driver. As shown in
-* the Pololu's documentation of the DRV8835 motor driver, when the MODE is 
-* equal to 1 (the pin is set to output HIGH), the robot will go forward at
-* the given speed specified by the parameters. The phase pins control the
-* direction of the spin, and the enbl pins control the speed of the motor.
-* 
-* A warning though, depending on the wiring, you might need to change the 
-* aphase and bphase from LOW to HIGH, in order for the robot to spin forward. 
-* 
-* Parameters:
-*  int posa: int value from 0 to 255; controls the speed of the motor A.
-*  int posb: int value from 0 to 255; controls the speed of the motor B.
-* 
-* Returns:
-*  none
-*************************************************************************/
+
 void forward_brake(int posa, int posb) {
   //set the appropriate values for aphase and bphase so that the robot goes straight
   if (posa > 0) {
@@ -281,23 +211,7 @@ void forward_brake(int posa, int posb) {
   }
 }
 
-/*************************************************************************
-* Function Name: PID_control
-**************************************************************************
-* Summary: 
-* This is the function of the PID control system. The distinguishing 
-* feature of the PID controller is the ability to use the three control 
-* terms of proportional, integral and derivative influence on the controller 
-* output to apply accurate and optimal control. This correction is applied to
-* the speed of the motors, which should be in range of the interval [0, max_speed],
-* max_speed <= 255. 
-* 
-* Parameters:
-* none
-* 
-* Returns:
-*  none
-*************************************************************************/
+
 
 void PID_control() {
   position = qtr.readLineBlack(sensorValues); //read the current position

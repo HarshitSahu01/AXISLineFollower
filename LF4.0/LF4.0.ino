@@ -11,10 +11,10 @@ uint16_t sensorValues[SensorCount];
 /*************************************************************************
 * PID control system variables 
 *************************************************************************/
-float Kp = 0.15; //related to the proportional control term; 
+float Kp = 0.28; //related to the proportional control term; 
               //change the value by trial-and-error (ex: 0.07).
               // Sweet spot: 0.06
-float Ki = 0.01; //related to the integral control term; 
+float Ki = 0.008; //related to the integral control term; 
               //change the value by trial-and-error (ex: 0.0008).
 float Kd = 0.8; //related to the derivative control term; 
               //change the value by trial-and-error (ex: 0.6).
@@ -31,8 +31,8 @@ boolean onoff = false;
 /*************************************************************************
 * Motor speed variables (choose between 0 - no speed, and 255 - maximum speed)
 *************************************************************************/
-const uint8_t maxspeeda = 250;
-const uint8_t maxspeedb = 250;
+const uint8_t maxspeeda = 255;
+const uint8_t maxspeedb = 255;
 const uint8_t basespeeda = 240;
 const uint8_t basespeedb = 240;
 
@@ -51,10 +51,12 @@ int benbl = 5;
 int buttoncalibrate = A6; //or pin A3
 int buttonstart = A7;
 uint16_t position;
+char turn_type;
 
 void rotate_right();
 void rotate_left();
 void test_emmiter();
+void forward_brake(int posa, int posb);
 
 int arr[SensorCount];
 int thresh = 500;
@@ -98,6 +100,8 @@ void setup() {
   forward_brake(0, 0); //stop the motors
   Serial.println("Calibrated");
 
+  while(analogRead(buttonstart) < 600) {}
+
   char mode;
 }
 
@@ -131,43 +135,155 @@ void rotate_left() {
   analogWrite(benbl, 0);
 }
 
-void test_emmiter() {
-  for (uint8_t i = 0; i < SensorCount; i++)
-  {
-    Serial.print(qtr.calibrationOn.minimum[i]);
-    Serial.print(' ');
-  }
-  Serial.println();
+// Code for turning
+void turn(char dir)
+{
+    switch(dir)
+    {
+    case 'L':
+        // Turn left 
+        
+        forward_brake(-250, 250);
+        delay(50);
+        while (position > 3600) {
+          position = qtr.readLineBlack(sensorValues);
+          forward_brake(-250, 250);
+        }
+        break;
+    case 'R':
+        // Turn right.
+        forward_brake(250, -250);
+        delay(50);
+        while (position < 3400) {
+          position = qtr.readLineBlack(sensorValues);
+          forward_brake(250, -250);
+        }
+        break;
+    case 'B':
+        // Turn around.
+        while (position == 0) {
+          position = qtr.readLineBlack(sensorValues);
+          forward_brake(250, -250);
+        } 
+        while (position == 7000) {
+          position = qtr.readLineBlack(sensorValues);
+          forward_brake(-250, 250);
+        }
+        break;
+    case 'S':
+        // Don't do anything!
+        break;
+    }
+}
 
-  // print the calibration maximum values measured when emitters were on
-  for (uint8_t i = 0; i < SensorCount; i++)
-  {
-    Serial.print(qtr.calibrationOn.maximum[i]);
-    Serial.print(' ');
-  }
-  Serial.println();
-  Serial.println();
+char select_turn(int found_left, int found_straight, int found_right){
+    if(found_right)
+        return 'L';
+    else if(found_straight)
+        return 'S';
+    else if(found_left)
+        return 'R';
+    else
+        return 'B';
+}
+
+void blinkk (char dir) {
+    forward_brake(0, 0);
+    delay(1000);
+    switch(dir)
+    {
+    case 'L':
+        for (int i = 0; i < 2; i++) {
+          digitalWrite(LED_BUILTIN, HIGH);
+          delay(200);
+          digitalWrite(LED_BUILTIN,  LOW);
+          delay(200);
+        }
+        break;
+    case 'R':
+        // Turn right.
+        for (int i = 0; i < 3; i++) {
+          digitalWrite(LED_BUILTIN, HIGH);
+          delay(200);
+          digitalWrite(LED_BUILTIN,  LOW);
+          delay(200);
+        }
+        break;
+    case 'B':
+        // Turn around.
+        for (int i = 0; i < 4; i++) {
+          digitalWrite(LED_BUILTIN, HIGH);
+          delay(200);
+          digitalWrite(LED_BUILTIN,  LOW);
+          delay(200);
+        }
+        break;
+    case 'S':
+        // Don't do anything!
+        break;
+    }
 }
 
 
 void loop() {
+
+  // if(analogRead(buttonstart) > 600) {
+  //   onoff =! onoff;
+  //   if(onoff = true) {
+  //     delay(1000);//a delay when the robot starts
+  //   }
+  //   else {
+  //     delay(50);
+  //   }
+  // }
+  // if (onoff == true) {
+  //   PID_control();
+  // }
+  // else {
+  //   forward_brake(0,0); //stop the motors
+  // }
+
   PID_control();
   // delay(500);
 
-  // qtr.read(sensorValues);
-  
-  while (position == 0) {
-    delay(200);
-    position = qtr.readLineBlack(sensorValues);
-    forward_brake(250, -250);
-  } 
-  while (position == 7000) {
-    delay(200);
-    position = qtr.readLineBlack(sensorValues);
-    forward_brake(-250, 250);
+  int found_left=0;
+  int found_straight=0;
+  int found_right=0;
+
+  found_left = (arr[0] || arr[1]) && (arr[3] || arr[4]);
+  found_right = (arr[6] || arr[7]) && (arr[3] || arr[4]);
+
+  if (found_left || found_right) {
+    forward_brake(250, 250);
+    delay(50);
+    found_straight = arr[3] || arr[4];
+    forward_brake(0, 0);
   }
 
+  if(found_straight || found_left || found_right) {
+    turn_type = select_turn(found_left, found_straight, found_right);
+    Serial.print(found_left);
+    Serial.print(found_straight);
+    Serial.println(found_right);
+
+    Serial.println(turn_type);
+    blinkk(turn_type);
+    turn(turn_type);
+  }
   
+  if (position == 0) {
+    delay(350);
+    while (position < 3400) {
+      position = qtr.readLineBlack(sensorValues);
+      forward_brake(250, -250);
+    }
+  } else if (position == 7000) {
+      delay(350);
+      while (position > 3600) {
+        position = qtr.readLineBlack(sensorValues);
+        forward_brake(-250, 250);
+      }
+  }
 
   // print the sensor values as numbers from 0 to 2500, where 0 means maximum
   // reflectance and 2500 means minimum reflectance
@@ -191,33 +307,9 @@ void loop() {
   //   while(1) {}
   // }
 
-  // else if(sensorValues[5] > 600 || sensorValues[6] > 600 || sensorValues[7] > 600) {
-  //   int rightTurn = 1;
-  // }
-  // else(sensorValues[3] > 600 || sensorValues[4] > 600) {
-  //   int forward = 1;
-  // }
 
 
-  // switch(mode) {
-  //   case 
-  // }
 
-  if(analogRead(buttonstart) > 700) {
-    onoff =! onoff;
-    if(onoff = true) {
-      delay(1000);//a delay when the robot starts
-    }
-    else {
-      delay(50);
-    }
-  }
-  if (onoff == true) {
-    PID_control();
-  }
-  else {
-    forward_brake(0,0); //stop the motors
-  }
 }
 
 
