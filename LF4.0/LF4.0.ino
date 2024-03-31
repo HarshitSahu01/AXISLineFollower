@@ -11,10 +11,10 @@ uint16_t sensorValues[SensorCount];
 /*************************************************************************
 * PID control system variables 
 *************************************************************************/
-float Kp = 0.28; //related to the proportional control term; 
+float Kp = 0.15; //related to the proportional control term; 
               //change the value by trial-and-error (ex: 0.07).
               // Sweet spot: 0.06
-float Ki = 0.008; //related to the integral control term; 
+float Ki = 0.01; //related to the integral control term; 
               //change the value by trial-and-error (ex: 0.0008).
 float Kd = 0.8; //related to the derivative control term; 
               //change the value by trial-and-error (ex: 0.6).
@@ -31,8 +31,8 @@ boolean onoff = false;
 /*************************************************************************
 * Motor speed variables (choose between 0 - no speed, and 255 - maximum speed)
 *************************************************************************/
-const uint8_t maxspeeda = 255;
-const uint8_t maxspeedb = 255;
+const uint8_t maxspeeda = 250;
+const uint8_t maxspeedb = 250;
 const uint8_t basespeeda = 240;
 const uint8_t basespeedb = 240;
 
@@ -177,11 +177,11 @@ void turn(char dir)
 }
 
 char select_turn(int found_left, int found_straight, int found_right){
-    if(found_right)
+    if(found_left)
         return 'L';
     else if(found_straight)
         return 'S';
-    else if(found_left)
+    else if(found_right)
         return 'R';
     else
         return 'B';
@@ -245,6 +245,10 @@ void loop() {
 
   PID_control();
   // delay(500);
+  forward_brake(0, 0);
+  
+  qtr.readLineBlack(sensorValues);
+  toBinaryArray();
 
   int found_left=0;
   int found_straight=0;
@@ -255,8 +259,8 @@ void loop() {
 
   if (found_left || found_right) {
     forward_brake(250, 250);
-    delay(50);
-    found_straight = arr[3] || arr[4];
+    delay(80);
+    found_straight = arr[2] || arr[3] || arr[4] || arr[5];
     forward_brake(0, 0);
   }
 
@@ -267,7 +271,7 @@ void loop() {
     Serial.println(found_right);
 
     Serial.println(turn_type);
-    blinkk(turn_type);
+    // blinkk(turn_type);
     turn(turn_type);
   }
   
@@ -335,31 +339,49 @@ void forward_brake(int posa, int posb) {
 
 
 void PID_control() {
-  position = qtr.readLineBlack(sensorValues); //read the current position
-  int error = 3500 - position; //3500 is the ideal position (the centre)
-  Serial.println(position);
+  while(1) {
+    position = qtr.readLineBlack(sensorValues); //read the current position
+    toBinaryArray();
+    int error = 3500 - position; //3500 is the ideal position (the centre)
+    Serial.println(position);
 
-  P = error;
-  I = I + error;
-  D = error - lastError;
-  lastError = error;
-  int motorspeed = P*Kp + I*Ki + D*Kd; //calculate the correction
-                                       //needed to be applied to the speed
-  
-  int motorspeeda = basespeeda + motorspeed;
-  int motorspeedb = basespeedb - motorspeed;
-  
-  if (motorspeeda > maxspeeda) {
-    motorspeeda = maxspeeda;
+    P = error;
+    I = I + error;
+    D = error - lastError;
+    lastError = error;
+    int motorspeed = P*Kp + I*Ki + D*Kd; //calculate the correction
+                                        //needed to be applied to the speed
+    
+    int motorspeeda = basespeeda + motorspeed;
+    int motorspeedb = basespeedb - motorspeed;
+    
+    if (motorspeeda > maxspeeda) {
+      motorspeeda = maxspeeda;
+    }
+    if (motorspeedb > maxspeedb) {
+      motorspeedb = maxspeedb;
+    }
+    if (motorspeeda < 0) {
+      motorspeeda = 0;
+    }
+    if (motorspeedb < 0) {
+      motorspeedb = 0;
+    } 
+    forward_brake(motorspeeda, motorspeedb);
+
+    if(arr[0] || arr[7]) {
+      break;
+    } if (!(arr[2] || arr[3] || arr[4] || arr[5])) {
+      break;
+    }
+
+  for (uint8_t i = 0; i < SensorCount; i++)
+  {
+    Serial.print(sensorValues[i]);
+    Serial.print('_');
+    Serial.print(arr[i]);
+    Serial.print('\t');
   }
-  if (motorspeedb > maxspeedb) {
-    motorspeedb = maxspeedb;
+  Serial.println();
   }
-  if (motorspeeda < 0) {
-    motorspeeda = 0;
-  }
-  if (motorspeedb < 0) {
-    motorspeedb = 0;
-  } 
-  forward_brake(motorspeeda, motorspeedb);
 }

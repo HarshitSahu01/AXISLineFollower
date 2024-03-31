@@ -98,6 +98,8 @@ void setup() {
   forward_brake(0, 0); //stop the motors
   Serial.println("Calibrated");
 
+  while(analogRead(buttonstart) < 600) {}
+
   char mode;
 }
 
@@ -131,25 +133,6 @@ void rotate_left() {
   analogWrite(benbl, 0);
 }
 
-void test_emmiter() {
-  for (uint8_t i = 0; i < SensorCount; i++)
-  {
-    Serial.print(qtr.calibrationOn.minimum[i]);
-    Serial.print(' ');
-  }
-  Serial.println();
-
-  // print the calibration maximum values measured when emitters were on
-  for (uint8_t i = 0; i < SensorCount; i++)
-  {
-    Serial.print(qtr.calibrationOn.maximum[i]);
-    Serial.print(' ');
-  }
-  Serial.println();
-  Serial.println();
-}
-
-
 void loop() {
   PID_control();
   // delay(500);
@@ -180,7 +163,7 @@ void loop() {
   }
   Serial.println();
 
-  toBinaryArray();
+  // toBinaryArray();
 
   
 
