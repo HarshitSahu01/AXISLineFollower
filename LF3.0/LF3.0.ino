@@ -70,7 +70,6 @@ uint16_t position;
 
 void rotate_right();
 void rotate_left();
-void test_emmiter();
 
 /*************************************************************************
 * Function Name: setup
@@ -164,25 +163,7 @@ void rotate_left() {
   analogWrite(bphase, rotation_speed);
   analogWrite(aenbl, rotation_speed + 40);
   analogWrite(benbl, 0);
-}
-
-void test_emmiter() {
-  for (uint8_t i = 0; i < SensorCount; i++)
-  {
-    Serial.print(qtr.calibrationOn.minimum[i]);
-    Serial.print(' ');
-  }
-  Serial.println();
-
-  // print the calibration maximum values measured when emitters were on
-  for (uint8_t i = 0; i < SensorCount; i++)
-  {
-    Serial.print(qtr.calibrationOn.maximum[i]);
-    Serial.print(' ');
-  }
-  Serial.println();
-  Serial.println();
-}
+}s
 
 /*************************************************************************
 * Function Name: loop
